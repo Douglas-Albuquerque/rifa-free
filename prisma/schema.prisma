@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RifaStatus {
+  RASCUNHO
+  ABERTA
+  ENCERRADA
+  SORTEADA
+}
+
+enum PagamentoStatus {
+  PENDENTE
+  PAGO
+}
+
+enum SorteioStatus {
+  CONCLUIDO
+}
+
+model AdminUser {
+  id        String     @id @default(cuid())
+  nome      String     @db.VarChar(120)
+  email     String     @unique @db.VarChar(160)
+  senhaHash String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  auditorias Auditoria[]
+}
+
+model Rifa {
+  id                 String            @id @default(cuid())
+  titulo             String            @db.VarChar(120)
+  descricao          String            @db.VarChar(2000)
+  quantidadeNumeros  Int
+  valorNumero        Int
+  dataInicio         DateTime?
+  dataSorteio        DateTime
+  status             RifaStatus        @default(ABERTA)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  reservas           Reserva[]
+  numeros            NumeroReservado[]
+  sorteio            Sorteio?
+  auditorias         Auditoria[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Participante {
+  id         String     @id @default(cuid())
+  nome       String     @db.VarChar(160)
+  telefone   String?    @db.VarChar(30)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  reservas   Reserva[]
+  sorteios   Sorteio[]
+
+  @@index([nome])
+}
+
+model Reserva {
+  id               String          @id @default(cuid())
+  rifaId           String
+  participanteId   String
+  statusPagamento  PagamentoStatus @default(PENDENTE)
+  valorCobrado     Int
+  pagoEm           DateTime?
+  observacoes      String?         @db.VarChar(1000)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  rifa             Rifa            @relation(fields: [rifaId], references: [id], onDelete: Cascade)
+  participante     Participante    @relation(fields: [participanteId], references: [id], onDelete: Restrict)
+  numeros          NumeroReservado[]
+
+  @@index([rifaId, statusPagamento])
+  @@index([participanteId])
+  @@index([createdAt])
+}
+
+model NumeroReservado {
+  id         String   @id @default(cuid())
+  rifaId     String
+  reservaId  String
+  numero     Int
+  createdAt  DateTime @default(now())
+  rifa       Rifa     @relation(fields: [rifaId], references: [id], onDelete: Cascade)
+  reserva    Reserva  @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+
+  @@unique([rifaId, numero])
+  @@index([reservaId])
+}
+
+model Sorteio {
+  id                  String        @id @default(cuid())
+  rifaId              String        @unique
+  numeroVencedor      Int
+  participanteId      String
+  dataHoraSorteio     DateTime      @default(now())
+  quantidadeElegivel  Int
+  numerosElegiveis    Int[]
+  status              SorteioStatus @default(CONCLUIDO)
+  createdAt           DateTime      @default(now())
+  rifa                Rifa          @relation(fields: [rifaId], references: [id], onDelete: Cascade)
+  participante        Participante  @relation(fields: [participanteId], references: [id], onDelete: Restrict)
+
+  @@index([participanteId])
+  @@index([dataHoraSorteio])
+}
+
+model Auditoria {
+  id               String      @id @default(cuid())
+  rifaId           String?
+  acao             String      @db.VarChar(60)
+  entidadeAfetada  String      @db.VarChar(60)
+  registroId       String?     @db.VarChar(80)
+  dadosAnteriores  Json?
+  dadosNovos       Json?
+  dataHora         DateTime    @default(now())
+  usuarioId        String
+  usuario          AdminUser   @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  rifa             Rifa?       @relation(fields: [rifaId], references: [id], onDelete: SetNull)
+
+  @@index([rifaId, dataHora])
+  @@index([dataHora])
+  @@index([usuarioId])
+}

@@ -1,0 +1,11 @@
+node_modules
+.next
+.env
+.env.local
+.env.docker
+.env.production
+.env.*.local
+coverage
+*.tsbuildinfo
+next-env.d.ts
+docker-data

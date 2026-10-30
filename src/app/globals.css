@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+@layer base {
+  * {
+    @apply border-ink-100;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-paper text-ink-900 antialiased;
+    background-image:
+      radial-gradient(60rem 40rem at 105% -10%, rgba(16, 185, 129, 0.10), transparent 55%),
+      radial-gradient(45rem 35rem at -10% 10%, rgba(251, 191, 36, 0.08), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  ::selection {
+    @apply bg-brand-200 text-brand-950;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-paper;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-3xl border border-ink-100 bg-white shadow-card;
+  }
+
+  .card-muted {
+    @apply rounded-2xl border border-ink-100 bg-ink-50/60;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-700;
+  }
+
+  .hint {
+    @apply mt-1 text-xs text-ink-500;
+  }
+
+  .input {
+    @apply min-h-11 w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-base text-ink-900 shadow-sm outline-none transition placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 disabled:cursor-not-allowed disabled:bg-ink-50 sm:text-sm;
+  }
+
+  .textarea {
+    @apply input min-h-24 resize-y;
+  }
+
+  .btn {
+    @apply inline-flex min-h-11 select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[.985] disabled:pointer-events-none disabled:opacity-55;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-700 text-white shadow-sm hover:bg-brand-800;
+  }
+
+  .btn-secondary {
+    @apply btn border border-ink-200 bg-white text-ink-800 hover:border-ink-300 hover:bg-ink-50;
+  }
+
+  .btn-ghost {
+    @apply btn text-ink-600 hover:bg-ink-100 hover:text-ink-900;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .btn-sm {
+    @apply min-h-9 rounded-lg px-3 py-1.5 text-xs;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-bold uppercase tracking-[0.2em] text-brand-700;
+  }
+
+  .display-title {
+    @apply font-display text-3xl font-semibold tracking-tight text-ink-950 sm:text-4xl;
+  }
+
+  .section-title {
+    @apply text-base font-semibold text-ink-900;
+  }
+
+  .table-wrap {
+    @apply overflow-x-auto rounded-2xl border border-ink-100;
+  }
+
+  .table {
+    @apply w-full border-collapse text-left text-sm;
+  }
+
+  .table thead {
+    @apply bg-ink-50/80 text-ink-500;
+  }
+
+  .table th {
+    @apply whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-wider;
+  }
+
+  .table td {
+    @apply border-t border-ink-100 px-4 py-3 align-middle;
+  }
+
+  .table tbody tr {
+    @apply transition hover:bg-brand-50/40;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded-xl bg-ink-100;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
