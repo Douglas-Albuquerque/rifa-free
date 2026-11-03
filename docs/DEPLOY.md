@@ -54,6 +54,40 @@ O seed é idempotente: se o e-mail já existe, nada é alterado. A senha do admi
 
 O cookie de sessão usa `Secure` automaticamente quando o proxy envia `X-Forwarded-Proto: https` (ou `Origin` HTTPS). Se o proxy TLS não enviar esses headers, defina `COOKIE_SECURE=true` no `.env.docker`. Em produção, acesse sempre por HTTPS; acesso por IP em HTTP é apenas para testes e não deve ser exposto na internet.
 
+### Situação atual desta máquina (ainda sem HTTPS)
+
+Enquanto não houver um domínio, a instalação roda **HTTP**:
+
+- `http://192.168.1.17` — rede local;
+- `http://100.64.2.42` — IP do Tailscale (tráfego criptografado pelo WireGuard
+  entre os dispositivos; o HTTP existe só no trecho final, dentro do host);
+- o Caddy do host faz proxy de `:80` para `127.0.0.1:3000`;
+- o IP público não é alcançável (CGNAT/sem port forwarding), então a aplicação
+  **não está exposta na internet**.
+
+O `tailscale cert` não funciona nesta conta: retorna
+`500 Internal Server Error: your Tailscale account does not support getting TLS certs`
+(`CertDomains: None`). Portanto, não há como emitir certificado via Tailscale.
+
+Para ativar HTTPS de verdade é preciso **um** destes caminhos:
+
+1. **Domínio próprio** (recomendado): aponte um `A`/`AAAA` para o servidor
+   (ou para um túnel) e troque o bloco `:80` do Caddyfile pelo domínio — o Caddy
+   emite e renova o certificado sozinho.
+2. **Cloudflare Tunnel**: dispensa port forwarding e fornece um hostname HTTPS.
+   Configure um túnel nomeado para `127.0.0.1:3000` e restrinja o acesso
+   (Cloudflare Access), pois o app ficará público.
+3. **Tailscale com TLS** apenas se o plano da conta passar a suportar
+   certificados (`tailscale cert <nome>.ts.net`).
+
+Até lá:
+
+- não publique as portas `80`, `443` ou `3000` no roteador;
+- mantenha o acesso restrito à LAN/Tailscale;
+- `COOKIE_SECURE` deve continuar **ausente/false** (com `true`, o navegador não
+  envia o cookie em HTTP e o login não persiste);
+- ao migrar para HTTPS, defina `COOKIE_SECURE=true` e valide o login novamente.
+
 Exemplo com Caddy no host, encaminhando para o app:
 
 ```caddyfile
@@ -225,7 +259,8 @@ Coloque o Nginx/Caddy na frente e aplique HTTPS. O app não deve ficar exposto d
 
 - [ ] `AUTH_SECRET` aleatório, com 32+ caracteres, diferente do desenvolvimento.
 - [ ] Senha forte no PostgreSQL e no administrador.
-- [ ] HTTPS ativo e HTTP redirecionando para HTTPS.
+- [ ] HTTPS ativo e HTTP redirecionando para HTTPS. **(pendente: sem domínio;
+  ver “Situação atual desta máquina” na seção 3)**
 - [ ] Porta 3000 fechada externamente; acesso apenas pelo proxy.
 - [ ] `.env`, `.env.docker` e backups com permissão restrita.
 - [ ] Backup diário testado e cópia externa.
@@ -233,4 +268,4 @@ Coloque o Nginx/Caddy na frente e aplique HTTPS. O app não deve ficar exposto d
 - [ ] Monitoramento do health check e do disco.
 - [ ] Acesso administrativo removido de quem não precisa.
 - [ ] Rate limit distribuído se houver mais de uma réplica (ver limitações em `ARCHITECTURE.md`).
-- [ ] Plano de atualização do Prisma 7 para resolver os advisories da CLI do Prisma 6 (ver limitações em `ARCHITECTURE.md`).
+- [ ] Plano de atualização do Prisma 7 (recomendado, não urgente: advisories da CLI já mitigados por override — ver `ARCHITECTURE.md`).

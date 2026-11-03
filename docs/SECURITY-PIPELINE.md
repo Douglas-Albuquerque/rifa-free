@@ -12,7 +12,8 @@ disparado manualmente em **Actions → Security Analysis → Run workflow**.
 | `semgrep` | Semgrep | SAST em TypeScript/React/Next.js, segredos, Dockerfile, GitHub Actions, OWASP Top 10 e JWT. |
 | `trivy` | Trivy | Vulnerabilidades em dependências, misconfigurações (Docker/Compose/IaC) e segredos no código. |
 | `sbom` | CycloneDX + Trivy | Gera o SBOM (`bom.json`, CycloneDX 1.6) e correlaciona os componentes com vulnerabilidades via `trivy sbom`. |
-| `report` | scripts Python | Consolida os achados, publica o relatório no **job summary** e envia o **email**. |
+| `image` | Docker + Trivy | Constrói a imagem de produção e escaneia **SO + runtime** (`trivy image`), cobrindo o que não está no `package-lock.json`. |
+| `report` | scripts Python | Consolida os achados dos 4 jobs, publica o relatório no **job summary** e envia o **email**. |
 
 Não há upload de SARIF nem uso de GitHub Code Scanning, então **não é necessário
 `security-events: write`**. O workflow usa apenas:
@@ -37,12 +38,13 @@ artefatos JSON ficam disponíveis por **7 dias**.
    - SBOM (componentes, licenças, serial);
    - status de cada ferramenta.
 2. **No email:** enviado ao final de toda execução, com sucesso ou falha.
-3. **Artefatos:** JSONs brutos e resumos de cada job, por 7 dias.
+3. **Artefatos:** JSONs brutos e resumos de cada job (`security-semgrep`,
+   `security-trivy`, `security-sbom`, `security-image`), por 7 dias.
 
 ## Política de falha
 
 Por padrão, a pipeline falha quando existe achado **ALTO** ou **CRÍTICO** em
-dependências de produção, SAST, misconfiguração ou segredo.
+dependências de produção, SAST, misconfiguração, segredo ou **imagem Docker**.
 
 - Para mudar o limite, crie a **variable** `FAIL_ON_SEVERITY` em
   **Settings → Secrets and variables → Actions → Variables** com um destes
@@ -50,6 +52,8 @@ dependências de produção, SAST, misconfiguração ou segredo.
 - Vulnerabilidades em **devDependencies** são exibidas no relatório como
   informativas e **não bloqueiam** o deploy (ferramentas de teste/build).
   A classificação vem do campo `dev` do `package-lock.json`.
+- Achados da **imagem Docker** são sempre tratados como produção (a imagem não
+  tem separação dev/prod) e **bloqueiam** a partir de `high`.
 
 > O job de relatório envia o email **antes** de sair com código de falha. Assim,
 > você recebe o resultado mesmo quando a pipeline quebra.
@@ -146,11 +150,18 @@ npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --package-lock-only \
   --output=security-results/sbom-vuln.json security-results/bom.json
 python3 .github/scripts/security/sbom_report.py
 
+# Imagem Docker (SO + runtime)
+docker build --tag rifa-free-scan:local .
+./trivy image --scanners vuln --format json \
+  --output=security-results/image-vuln.json rifa-free-scan:local
+python3 .github/scripts/security/image_report.py
+
 # Relatório final + email (sem as secrets de SMTP ele apenas avisa e não envia)
 GITHUB_REPOSITORY=owner/repo GITHUB_REF_NAME=main GITHUB_SHA=... \
 GITHUB_RUN_ID=... GITHUB_SERVER_URL=https://github.com \
 GITHUB_STEP_SUMMARY=/tmp/summary.md \
 SEMGREP_RESULT=success TRIVY_RESULT=success SBOM_RESULT=success \
+IMAGE_RESULT=success \
 python3 .github/scripts/security/final_report.py
 ```
 
@@ -163,8 +174,16 @@ python3 .github/scripts/security/final_report.py
     ainda fixa a linha 7.x.
   Ao atualizar o Prisma, confira se o override continua necessário e remova-o
   quando a versão nativa já vier corrigida (Prisma `7.10.1+`).
-- Vulnerabilidades de `vitest`, `tinypool`, `esbuild`, `minimatch` e
-  `@vitest/mocker` são de **desenvolvimento** e aparecem como informativas.
+- Vulnerabilidades de ferramentas de desenvolvimento (`vitest`, `esbuild`,
+  `minimatch` etc.) são resolvidas pelos overrides/versões atuais e aparecem
+  como informativas. Situação atual: `npm audit` (produção e dev) = **0**.
+- O override global de `minimatch` para `11.0.1` corrige o advisory
+  `GHSA-g3hv-75wg-m249` em toda a árvore. Reavalie ao atualizar ESLint.
+- A imagem final não contém `npm`/`npx`/`yarn`/`corepack`: eles eram a origem de
+  quase todas as CVEs de runtime (node-tar, sigstore, pacote). O estágio `runner`
+  só precisa de `node`, `.next/standalone` e `node_modules/.prisma`.
+- O `Dockerfile` roda `apk upgrade` no estágio base para trazer correções do SO
+  (musl, zlib). O job `image` garante que uma regressão seja detectada no CI.
 
 ## Limitações
 

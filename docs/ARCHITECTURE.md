@@ -118,7 +118,7 @@ A auditoria é gravada na mesma transação da mutação: se a operação falhar
 - **Sem pagamento online**: o status é controlado manualmente pelo organizador.
 - **Edição pós-sorteio**: número vencedor e reserva vencedora são imutáveis, mas os demais campos da rifa ainda podem ser editados.
 - **Auditoria sem UI de filtros avançados**: a listagem é por rifa/histórico, sem exportação.
-- **Avisos de dependência do Prisma 6**: o `npm audit` reporta advisories na cadeia de CLI/config do Prisma 6 (`@prisma/config`, `effect`, `deepmerge-ts`). A correção exige Prisma 7, que muda o gerador e a configuração do client; a atualização deve ser feita com regressão completa de migrações, testes e Docker. Não execute `npm audit fix --force` em produção sem esse plano. O client de consulta usado em runtime não executa esses componentes de CLI.
+- **Dependência do Prisma 6**: a cadeia de CLI/config do Prisma 6 (`@prisma/config`, `effect`, `deepmerge-ts`) foi corrigida com o Prisma `6.19.3` + override `deepmerge-ts@8.0.2`; o `npm audit` está zerado. A migração para o Prisma 7 (novo gerador/config) continua recomendada, mas não é mais urgente por segurança. Não execute `npm audit fix --force` em produção: ele pode propor majors sem regressão. O client de consulta usado em runtime não executa esses componentes de CLI.
 
 ## Extensões naturais
 
