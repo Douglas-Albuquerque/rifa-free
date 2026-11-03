@@ -41,6 +41,7 @@ MAX_EMAIL_OTHER = 20
 INPUT_FILES = {
     "Semgrep": RESULTS_DIR / "semgrep-findings.json",
     "Trivy": RESULTS_DIR / "trivy-findings.json",
+    "Trivy (imagem)": RESULTS_DIR / "image-findings.json",
     "CycloneDX (SBOM)": RESULTS_DIR / "sbom-findings.json",
 }
 
@@ -79,6 +80,7 @@ def execution_findings(notes: list[str]) -> list[dict]:
     statuses = {
         "Semgrep": env("SEMGREP_RESULT", "unknown"),
         "Trivy": env("TRIVY_RESULT", "unknown"),
+        "Trivy (imagem)": env("IMAGE_RESULT", "unknown"),
         "CycloneDX (SBOM)": env("SBOM_RESULT", "unknown"),
     }
     for tool, status in statuses.items():
@@ -280,6 +282,7 @@ def build_markdown(
             [
                 ["Semgrep (SAST)", tool_status_label(env("SEMGREP_RESULT"))],
                 ["Trivy (deps/misconfig/segredos)", tool_status_label(env("TRIVY_RESULT"))],
+                ["Trivy (imagem Docker)", tool_status_label(env("IMAGE_RESULT"))],
                 ["CycloneDX (SBOM)", tool_status_label(env("SBOM_RESULT"))],
             ],
         ),

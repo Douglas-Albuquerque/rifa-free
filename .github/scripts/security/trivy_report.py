@@ -38,7 +38,12 @@ MAX_CONFIGS = 40
 MAX_SECRETS = 30
 
 
-def parse_vulnerabilities(data: dict, tool: str = "Trivy") -> list[dict]:
+def parse_vulnerabilities(
+    data: dict,
+    tool: str = "Trivy",
+    category: str = "Dependencia",
+    environment: str | None = None,
+) -> list[dict]:
     findings = []
     for result in data.get("Results") or []:
         target_file = result.get("Target") or ""
@@ -46,7 +51,8 @@ def parse_vulnerabilities(data: dict, tool: str = "Trivy") -> list[dict]:
             package = vuln.get("PkgName") or "pacote"
             installed = vuln.get("InstalledVersion") or ""
             fixed = vuln.get("FixedVersion") or ""
-            is_dev = package in DEV_PACKAGES
+            # Imagem Docker nao tem separacao dev/prod: tudo que esta la e runtime.
+            is_dev = environment is None and package in DEV_PACKAGES
             if fixed:
                 remediation = f"Atualizar {package} de {installed or '?'} para {fixed}."
             else:
@@ -57,8 +63,8 @@ def parse_vulnerabilities(data: dict, tool: str = "Trivy") -> list[dict]:
             findings.append(
                 {
                     "tool": tool,
-                    "category": "Dependencia (dev)" if is_dev else "Dependencia",
-                    "environment": "dev" if is_dev else "prod",
+                    "category": f"{category} (dev)" if is_dev else category,
+                    "environment": "dev" if is_dev else (environment or "prod"),
                     "severity": normalize_severity(vuln.get("Severity")),
                     "id": vuln.get("VulnerabilityID") or "CVE",
                     "title": truncate(
