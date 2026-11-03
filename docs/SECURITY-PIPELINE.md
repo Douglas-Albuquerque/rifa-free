@@ -154,12 +154,15 @@ SEMGREP_RESULT=success TRIVY_RESULT=success SBOM_RESULT=success \
 python3 .github/scripts/security/final_report.py
 ```
 
-## Achados conhecidos na primeira execução
+## Dependências de produção e overrides
 
-- `deepmerge-ts` (`7.1.5 → 8.0.0`) e `effect` (`3.16.12 → 3.20.0`), ambos
-  transitivos de `@prisma/config`. São **ALTO** e bloqueiam a pipeline;
-  a correção definitiva acompanha a atualização do Prisma (ver
-  `docs/ARCHITECTURE.md`).
+- `deepmerge-ts` e `effect`, transitivos de `@prisma/config`, eram **ALTO** nas
+  versões antigas. Foram corrigidos com:
+  - Prisma `6.19.3` (traz `effect` `3.21.0`);
+  - override `"deepmerge-ts": "8.0.2"` no `package.json`, porque o Prisma 6.x
+    ainda fixa a linha 7.x.
+  Ao atualizar o Prisma, confira se o override continua necessário e remova-o
+  quando a versão nativa já vier corrigida (Prisma `7.10.1+`).
 - Vulnerabilidades de `vitest`, `tinypool`, `esbuild`, `minimatch` e
   `@vitest/mocker` são de **desenvolvimento** e aparecem como informativas.
 
