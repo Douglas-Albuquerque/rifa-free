@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 
 FROM node:20-alpine AS base
-RUN apk add --no-cache libc6-compat openssl
+# Atualiza os pacotes do Alpine para pegar correcoes de seguranca (musl, zlib etc.).
+RUN apk add --no-cache libc6-compat openssl \
+  && apk upgrade --no-cache
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -25,7 +27,13 @@ CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed"]
 FROM base AS runner
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs \
-  && adduser --system --uid 1001 nextjs
+  && adduser --system --uid 1001 nextjs \
+  # npm/yarn/corepack nao sao usados em runtime e trazem dezenas de CVEs
+  # (node-tar, pacote, sigstore, minimatch...). Remove do estagio final.
+  && rm -rf /usr/local/lib/node_modules/npm \
+    /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx \
+    /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
