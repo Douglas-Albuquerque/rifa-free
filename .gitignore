@@ -6,6 +6,9 @@ node_modules
 .env.production
 .env.*.local
 coverage
+security-results
+__pycache__/
+*.pyc
 *.tsbuildinfo
 next-env.d.ts
 docker-data

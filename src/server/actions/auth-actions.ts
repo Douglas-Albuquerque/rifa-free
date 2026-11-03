@@ -12,6 +12,9 @@ import { loginSchema } from "@/lib/validation";
 
 import { actionFailureFromZod, formString } from "./helpers";
 
+// Hash ficticio apenas para igualar o tempo de resposta quando o e-mail nao existe.
+// Nao e uma credencial real e nunca corresponde a uma senha valida.
+// nosemgrep: generic.secrets.security.detected-bcrypt-hash.detected-bcrypt-hash
 const DUMMY_HASH = "$2b$10$Pc9umsZDOGYaWpW0HoccQ.XjslvjcJRDodP5B2.5TYJlOlB.rYYCi";
 
 function safeNext(next: string | undefined) {

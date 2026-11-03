@@ -170,6 +170,8 @@ Decisões técnicas e limitações conhecidas: [docs/ARCHITECTURE.md](docs/ARCHI
 - Rate limit de login por IP + e-mail.
 - Validação Zod no servidor, consultas parametrizadas e headers de segurança (`X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`).
 - Em produção use HTTPS e siga o checklist de [docs/DEPLOY.md](docs/DEPLOY.md).
+- Pipeline de segurança (Semgrep, Trivy e CycloneDX) com relatório e email em
+  [docs/SECURITY-PIPELINE.md](docs/SECURITY-PIPELINE.md).
 
 ## Licença
 

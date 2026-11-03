@@ -1,0 +1,278 @@
+name: Security Analysis
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Menor privilegio: o workflow so precisa ler o codigo.
+# Nao usa SARIF nem code scanning, portanto nao requer security-events: write.
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FAIL_ON_SEVERITY: ${{ vars.FAIL_ON_SEVERITY || 'high' }}
+  SEMGREP_VERSION: "1.183.0"
+  TRIVY_VERSION: "v0.76.1"
+  CYCLONEDX_NPM_VERSION: "6.0.1"
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  semgrep:
+    name: Semgrep (SAST)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Actions fixadas por SHA (imutavel). Atualize via Dependabot.
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Configurar Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Instalar Semgrep
+        run: |
+          python -m pip install --disable-pip-version-check "semgrep==${SEMGREP_VERSION}"
+
+      - name: Executar Semgrep (SAST, segredos e GitHub Actions)
+        run: |
+          mkdir -p security-results
+          semgrep scan \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --config=p/typescript \
+            --config=p/react \
+            --config=p/nodejs \
+            --config=p/nextjs \
+            --config=p/dockerfile \
+            --config=p/github-actions \
+            --config=p/owasp-top-ten \
+            --config=p/jwt \
+            --exclude=node_modules \
+            --exclude=.next \
+            --exclude=coverage \
+            --metrics=off \
+            --quiet \
+            --json \
+            --output=security-results/semgrep.json
+
+      - name: Gerar resumo do Semgrep
+        if: always()
+        run: |
+          python .github/scripts/security/semgrep_report.py || true
+          if [ -f security-results/semgrep-summary.md ]; then
+            cat security-results/semgrep-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Publicar resultados do Semgrep
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: security-semgrep
+          path: |
+            security-results/semgrep.json
+            security-results/semgrep-findings.json
+            security-results/semgrep-summary.md
+          retention-days: 7
+          if-no-files-found: warn
+
+  trivy:
+    name: Trivy (dependencias, misconfig e segredos)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Instalar Trivy (binario + checksum)
+        run: |
+          archive="trivy_${TRIVY_VERSION#v}_Linux-64bit.tar.gz"
+          base="https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}"
+          mkdir -p "$HOME/.local/bin" "$RUNNER_TEMP/trivy"
+          curl -fsSL -o "$RUNNER_TEMP/trivy/$archive" "$base/$archive"
+          curl -fsSL -o "$RUNNER_TEMP/trivy/checksums.txt" \
+            "$base/trivy_${TRIVY_VERSION#v}_checksums.txt"
+          grep -F " $archive" "$RUNNER_TEMP/trivy/checksums.txt" \
+            | (cd "$RUNNER_TEMP/trivy" && sha256sum -c -)
+          tar -xzf "$RUNNER_TEMP/trivy/$archive" -C "$HOME/.local/bin" trivy
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/trivy" --version
+
+      - name: Vulnerabilidades em dependencias
+        run: |
+          mkdir -p security-results
+          trivy fs \
+            --scanners vuln \
+            --include-dev-deps \
+            --skip-dirs .git \
+            --skip-dirs node_modules \
+            --skip-dirs .next \
+            --format json \
+            --output security-results/trivy-vuln.json \
+            .
+
+      - name: Misconfiguracoes (Docker, Compose e IaC)
+        run: |
+          trivy config \
+            --skip-dirs .git \
+            --skip-dirs node_modules \
+            --skip-dirs .next \
+            --format json \
+            --output security-results/trivy-config.json \
+            .
+
+      - name: Segredos no codigo
+        run: |
+          trivy fs \
+            --scanners secret \
+            --skip-dirs .git \
+            --skip-dirs node_modules \
+            --skip-dirs .next \
+            --skip-dirs tests \
+            --skip-dirs docs \
+            --skip-files .env.example \
+            --skip-files .env.docker.example \
+            --skip-files README.md \
+            --skip-files CLAUDE.md \
+            --format json \
+            --output security-results/trivy-secret.json \
+            .
+
+      - name: Gerar resumo do Trivy
+        if: always()
+        run: |
+          python3 .github/scripts/security/trivy_report.py || true
+          if [ -f security-results/trivy-summary.md ]; then
+            cat security-results/trivy-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Publicar resultados do Trivy
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: security-trivy
+          path: |
+            security-results/trivy-vuln.json
+            security-results/trivy-config.json
+            security-results/trivy-secret.json
+            security-results/trivy-findings.json
+            security-results/trivy-summary.md
+          retention-days: 7
+          if-no-files-found: warn
+
+  sbom:
+    name: CycloneDX (SBOM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Gerar SBOM CycloneDX
+        run: |
+          mkdir -p security-results
+          npx --yes "@cyclonedx/cyclonedx-npm@${CYCLONEDX_NPM_VERSION}" \
+            --package-lock-only \
+            --output-file security-results/bom.json \
+            --output-format json \
+            --spec-version 1.6 \
+            --ignore-npm-errors \
+            --validate
+
+      - name: Instalar Trivy (binario + checksum)
+        run: |
+          archive="trivy_${TRIVY_VERSION#v}_Linux-64bit.tar.gz"
+          base="https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}"
+          mkdir -p "$HOME/.local/bin" "$RUNNER_TEMP/trivy"
+          curl -fsSL -o "$RUNNER_TEMP/trivy/$archive" "$base/$archive"
+          curl -fsSL -o "$RUNNER_TEMP/trivy/checksums.txt" \
+            "$base/trivy_${TRIVY_VERSION#v}_checksums.txt"
+          grep -F " $archive" "$RUNNER_TEMP/trivy/checksums.txt" \
+            | (cd "$RUNNER_TEMP/trivy" && sha256sum -c -)
+          tar -xzf "$RUNNER_TEMP/trivy/$archive" -C "$HOME/.local/bin" trivy
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Analisar o SBOM com Trivy
+        run: |
+          trivy sbom \
+            --scanners vuln \
+            --format json \
+            --output security-results/sbom-vuln.json \
+            security-results/bom.json
+
+      - name: Gerar resumo do SBOM
+        if: always()
+        run: |
+          python3 .github/scripts/security/sbom_report.py || true
+          if [ -f security-results/sbom-summary.md ]; then
+            cat security-results/sbom-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Publicar resultados do SBOM
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: security-sbom
+          path: |
+            security-results/bom.json
+            security-results/sbom-vuln.json
+            security-results/sbom-findings.json
+            security-results/sbom-meta.json
+            security-results/sbom-summary.md
+          retention-days: 7
+          if-no-files-found: warn
+
+  report:
+    name: Relatorio consolidado e email
+    runs-on: ubuntu-latest
+    needs: [semgrep, trivy, sbom]
+    if: always()
+    timeout-minutes: 15
+    env:
+      SEMGREP_RESULT: ${{ needs.semgrep.result }}
+      TRIVY_RESULT: ${{ needs.trivy.result }}
+      SBOM_RESULT: ${{ needs.sbom.result }}
+      FAIL_ON_SEVERITY: ${{ vars.FAIL_ON_SEVERITY || 'high' }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_SECURITY: ${{ secrets.SMTP_SECURITY }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      MAIL_FROM: ${{ secrets.MAIL_FROM }}
+      MAIL_TO: ${{ secrets.MAIL_TO }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Baixar artefatos das analises
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        continue-on-error: true
+        with:
+          path: security-results
+          pattern: security-*
+          merge-multiple: true
+
+      - name: Consolidar resumo, publicar na tela e enviar email
+        run: python3 .github/scripts/security/final_report.py
