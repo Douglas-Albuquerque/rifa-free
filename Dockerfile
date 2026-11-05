@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-alpine AS base
+FROM node:26-alpine AS base
 # Atualiza os pacotes do Alpine para pegar correcoes de seguranca (musl, zlib etc.).
 RUN apk add --no-cache libc6-compat openssl \
   && apk upgrade --no-cache

@@ -182,6 +182,8 @@ python3 .github/scripts/security/final_report.py
 - A imagem final não contém `npm`/`npx`/`yarn`/`corepack`: eles eram a origem de
   quase todas as CVEs de runtime (node-tar, sigstore, pacote). O estágio `runner`
   só precisa de `node`, `.next/standalone` e `node_modules/.prisma`.
+- A imagem base é `node:26-alpine` (LTS). O Node 20 chegou ao fim do suporte
+  em abril/2026 e deixou de receber correções de segurança.
 - O `Dockerfile` roda `apk upgrade` no estágio base para trazer correções do SO
   (musl, zlib). O job `image` garante que uma regressão seja detectada no CI.
 
@@ -194,3 +196,7 @@ python3 .github/scripts/security/final_report.py
   relatório.
 - Actions fixadas por SHA precisam ser atualizadas periodicamente (Dependabot
   pode fazer isso).
+- O Dependabot agrupa apenas atualizações **minor/patch**. Majors (Next, React,
+  Prisma, Node etc.) abrem PRs individuais e exigem migração e revisão manual;
+  não faça merge sem rodar testes e o build da imagem. PRs do Dependabot não
+  recebem as secrets de SMTP, então o email não é enviado nesses casos.

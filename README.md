@@ -31,7 +31,7 @@ Aplicação web para organizar rifas numéricas de ponta a ponta: cadastro da ri
 
 ### Requisitos
 
-- Node.js 20+
+- Node.js 26+ (LTS)
 - Docker (para o PostgreSQL) ou um PostgreSQL 16 local
 - Chrome/Chromium apenas para o teste E2E
 
