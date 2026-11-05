@@ -149,7 +149,7 @@ src/
     queries.ts         consultas de leitura e indicadores
 prisma/                schema, migrações, seed e criação de admin
 tests/                 integração (Vitest) e smoke E2E
-docs/                  arquitetura e implantação
+docs/                  arquitetura, implantação e relatório de segurança
 ```
 
 Decisões técnicas e limitações conhecidas: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -172,6 +172,8 @@ Decisões técnicas e limitações conhecidas: [docs/ARCHITECTURE.md](docs/ARCHI
 - Em produção use HTTPS e siga o checklist de [docs/DEPLOY.md](docs/DEPLOY.md).
 - Pipeline de segurança (Semgrep, Trivy e CycloneDX) com relatório e email em
   [docs/SECURITY-PIPELINE.md](docs/SECURITY-PIPELINE.md).
+- Histórico da análise, correções e resultados em
+  [docs/RELATORIO-SEGURANCA.md](docs/RELATORIO-SEGURANCA.md).
 
 ## Licença
 
